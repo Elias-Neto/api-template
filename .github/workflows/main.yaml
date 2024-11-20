@@ -1,0 +1,51 @@
+name: CI
+on:
+  push:
+    branches: ['develop', 'main']
+  pull_request:
+    branches: [ "develop", "master" ]
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+
+    services:
+      mongodb:
+        image: mongo
+        ports:
+          - 27018:27017
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18.16.0'
+          cache: 'yarn'
+          cache-dependency-path: 'yarn.lock'
+
+      - name: Set up Docker
+        uses: docker/setup-buildx-action@v2
+      - name: Install Docker Compose
+        run: sudo apt-get update && sudo apt-get install -y docker-compose
+
+      - name: Start MongoDB
+        run: docker-compose up -d
+
+      - name: Wait for MongoDB
+        run: |
+          while ! nc -z localhost 27017; do
+            sleep 1
+          done
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Test
+        run: yarn test
+
+      - name: Stop MongoDB
+        run: docker-compose down
